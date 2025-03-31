@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>이름 땋기...</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #ffffff;
+      color: white;
+      overflow: hidden;
+    }
+
+    .input-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      margin: 50px auto 20px;
+    }
+
+    #inputField {
+      width: 30%;
+      padding: 12px;
+      font-size: 13px;
+      font-style: italic;
+      color: rgb(0, 0, 0);
+      border: 1.5px solid rgba(0, 0, 0, 0.82);
+      border-radius: 10px;
+      background-color: transparent;
+      text-align: center;
+    }
+
+    #inputField::placeholder {
+      color: rgb(0, 0, 0);
+    }
+
+    #shuffleBtn {
+      padding: 10px 14px;
+      background-color: black;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #shuffleBtn svg {
+      width: 18px;
+      height: 18px;
+      fill: white;
+    }
+
+    #svgContainer {
+      width: 100vw;
+      height: 80vh;
+      overflow-x: auto;
+      overflow-y: auto;
+      white-space: nowrap;
+      cursor: grab;
+    }
+
+    svg {
+      height: 3000px;
+      overflow: visible;
+    }
+
+    .rubberband {
+      fill: none;
+      stroke-width: 28;
+      stroke-linecap: round;
+      shape-rendering: geometricPrecision;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .label {
+      fill: rgb(0, 0, 0);
+      font-size: 12px;
+      text-anchor: middle;
+    }
+
+    #svgContainer::-webkit-scrollbar {
+      height: 1px;
+      width: 1px;
+    }
+
+    #svgContainer::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.549);
+      border-radius: 4px;
+    }
+
+    #svgContainer::-webkit-scrollbar-track {
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="input-wrapper">
+    <input type="text" id="inputField" placeholder="이름을 입력 후 엔터를 누르세요" />
+    <button id="shuffleBtn" title="색상 셔플">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <path fill="white" d="M48 16h8v8h-4.7l-6.8 6.8c-2.3 2.3-6 2.3-8.3 0L21.9 15.9C20.2 14.2 18 13.3 15.7 13.3H8v-4h8c3.3 0 6.5 1.3 8.8 3.7l14.2 14.2c.8.8 2.1.8 2.8 0L48 20.7V16zm8 24v8h-8v-4.7l-6.8-6.8c-2.3-2.3-6-2.3-8.3 0L21.9 48.1c-2.3 2.3-5.5 3.7-8.8 3.7H8v-4h5.7c2.3 0 4.5-.9 6.2-2.6l14.2-14.2c2.3-2.3 6-2.3 8.3 0l6.8 6.8V40h8z"/>
+      </svg>
+    </button>
+    
+  </div>
+
+  <div id="svgContainer">
+    <svg id="braidSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <script>
+    const svg = document.getElementById("braidSvg");
+    const inputField = document.getElementById("inputField");
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    const container = document.getElementById("svgContainer");
+
+    const baseColors = [
+      "#FF00CC", "#FBFF00", "#00C628", "#00B0FF", "#FF6600", "#FFD700", "#BF40BF",
+      "#FF1493", "#00FF7F", "#FF4500", "#32CD32", "#1E90FF", "#FF69B4", "#ADFF2F", "#FF8C00"
+    ];
+
+    let braidCount = 0;
+    let lastInput = "";
+    let currentBraid = null;
+    const allBraids = [];
+
+    function getRandomColors(count) {
+      return baseColors.sort(() => 0.5 - Math.random()).slice(0, count);
+    }
+
+    function createBraid(offsetX, label) {
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      svg.appendChild(group);
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", offsetX);
+      text.setAttribute("y", 15);
+      text.setAttribute("class", "label");
+      text.textContent = label;
+      group.appendChild(text);
+
+      const count = label.length;
+      const spacing = 10;
+      const startX = offsetX - ((count - 1) * spacing) / 2;
+
+      const currentColors = getRandomColors(count);
+      const strands = [];
+
+      for (let i = 0; i < count; i++) {
+  let xOffset = 0;
+  if (i === 1) {
+    xOffset = 10; // 원하는 만큼 오른쪽 이동
+  }
+
+  strands.push({
+    xBase: startX + i * spacing + xOffset,
+    color: currentColors[i],
+    segments: [],
+    phase: (2 * Math.PI * i) / count
+  });
+}
+      const braid = {
+        group,
+        strands,
+        progress: 30,
+        isAnimating: true
+      };
+
+      allBraids.push(braid);
+
+      if (currentBraid) {
+        currentBraid.isAnimating = false;
+      }
+      currentBraid = braid;
+
+      animateBraid(braid);
+    }
+
+    function animateBraid(braid) {
+      if (!braid.isAnimating) return;
+
+      const { strands, progress, group } = braid;
+
+      const amplitude = 60;
+      const frequency = 0.01;
+
+      strands.forEach((strand) => {
+        if (progress % 30 === 0) {
+          const newPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          newPath.setAttribute("stroke", strand.color);
+          newPath.setAttribute("class", "rubberband");
+          group.appendChild(newPath);
+          strand.segments.push({ path: newPath, startY: progress });
+        }
+
+        const segment = strand.segments[strand.segments.length - 1];
+        let d = `M${strand.xBase},${segment.startY}`;
+
+        for (let y = segment.startY; y <= progress; y += 0.25) {
+          const wave = amplitude * Math.sin((y * frequency) + strand.phase);
+          const x = strand.xBase + wave;
+          d += ` L${x.toFixed(2)},${y.toFixed(2)}`;
+        }
+
+        segment.path.setAttribute("d", d);
+      });
+
+      braid.progress += 3;
+      requestAnimationFrame(() => animateBraid(braid));
+    }
+
+    function updateSvgWidth() {
+      svg.setAttribute("width", `${150 + braidCount * 60}px`);
+    }
+
+    function scrollToRight() {
+      container.scrollLeft = container.scrollWidth;
+    }
+
+    inputField.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && inputField.value.trim() !== "") {
+        const label = inputField.value.trim();
+        if (label !== lastInput) {
+          lastInput = label;
+          const xGap = 60;
+          const offsetX = 150 + braidCount * xGap;
+          createBraid(offsetX, label);
+          braidCount++;
+          updateSvgWidth();
+          scrollToRight();
+        }
+      }
+    });
+
+    shuffleBtn.addEventListener("click", () => {
+      allBraids.forEach((braid) => {
+        const newColors = getRandomColors(braid.strands.length);
+        braid.strands.forEach((strand, idx) => {
+          strand.color = newColors[idx];
+          strand.segments.forEach(segment => {
+            segment.path.setAttribute("stroke", newColors[idx]);
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>
